@@ -1,3 +1,4 @@
+import secrets
 from typing import Dict
 import json
 
@@ -32,8 +33,8 @@ app = Flask(__name__)
 rp_id = "localhost"
 origin = "http://localhost:5000"
 rp_name = "Sample RP"
-user_id = "some_random_user_identifier_like_a_uuid"
-username = f"your.name@{rp_id}"
+user_id = "passkey_id_123456"
+username = f"jinzhou.wu@{rp_id}"
 print(f"User ID: {user_id}")
 print(f"Username: {username}")
 
@@ -84,6 +85,7 @@ def handler_generate_registration_options():
     global logged_in_user_id
 
     user = in_memory_db[logged_in_user_id]
+    print("generate-registration-options", in_memory_db)
 
     options = generate_registration_options(
         rp_id=rp_id,
@@ -99,7 +101,7 @@ def handler_generate_registration_options():
         ),
         supported_pub_key_algs=[
             COSEAlgorithmIdentifier.ECDSA_SHA_256,
-            COSEAlgorithmIdentifier.RSASSA_PKCS1_v1_5_SHA_256,
+            # COSEAlgorithmIdentifier.RSASSA_PKCS1_v1_5_SHA_256,
         ],
     )
 
@@ -127,6 +129,7 @@ def handler_verify_registration_response():
         return {"verified": False, "msg": str(err), "status": 400}
 
     user = in_memory_db[logged_in_user_id]
+    print("verify-registration-response", in_memory_db)
 
     new_credential = Credential(
         id=verification.credential_id,
@@ -153,6 +156,7 @@ def handler_generate_authentication_options():
     global logged_in_user_id
 
     user = in_memory_db[logged_in_user_id]
+    print("generate-authentication-options", in_memory_db)
 
     options = generate_authentication_options(
         rp_id=rp_id,
@@ -161,6 +165,9 @@ def handler_generate_authentication_options():
             for cred in user.credentials
         ],
         user_verification=UserVerificationRequirement.REQUIRED,
+        
+        # generate a 32 bytes challenge to mock userOpHash
+        challenge=secrets.token_bytes(32)
     )
 
     current_authentication_challenge = options.challenge
@@ -176,10 +183,14 @@ def hander_verify_authentication_response():
     body = request.get_data()
 
     try:
+        print("verify-authentication-response body", body)
         credential = AuthenticationCredential.parse_raw(body)
+        print("verify-authentication-response credential", credential)
 
         # Find the user's corresponding public key
         user = in_memory_db[logged_in_user_id]
+        print("verify-authentication-response in_memory_db", in_memory_db)
+
         user_credential = None
         for _cred in user.credentials:
             if _cred.id == credential.raw_id:
